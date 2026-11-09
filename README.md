@@ -21,7 +21,7 @@ All projects, names and amounts in these images are made up.
 ## Install
 
 1. Open the [latest release](https://github.com/BetterEdgeLLC/timetracker/releases/latest).
-2. Download `Timetracker-Setup-1.2.0.exe` and run it. It installs for your Windows user, so you don't need admin rights.
+2. Download `Timetracker-Setup-1.3.0.exe` and run it. It installs for your Windows user, so you don't need admin rights.
 
 The installer isn't code-signed, so Windows SmartScreen may warn you on first launch. Click **More info**, then **Run anyway**. If you'd rather not trust a binary, [build it yourself](#build-from-source).
 
@@ -32,6 +32,7 @@ Timetracker starts with Windows by default and sits in the tray. You can turn th
 | Area | What you get |
 |---|---|
 | Timer | Start, pause, resume and stop per project. Breaks don't count as work. |
+| Parallel timers | Track up to five projects at once. A small plus next to the project name adds another, and every extra timer is a single colored dot. |
 | Side widget | A small button in the middle of the right screen edge. Hover it and the controls slide out, over any app. Clicks next to it go through to the window below. |
 | Quick project switch | Change project from the widget while the timer runs. The current session is saved and a new one starts right away. |
 | Session names | Every session gets a default name from project and date. Rename it while it runs, right after stopping, or later. |
@@ -42,8 +43,8 @@ Timetracker starts with Windows by default and sits in the tray. You can turn th
 | CSV export | Export the current table or every session in the period, ready for Excel and other spreadsheets. |
 | Copy to clipboard | Copy the same data without saving a file. Choose all projects or only some, then paste into Excel, Google Sheets or anywhere else. |
 | Languages | English and German, switchable in Settings. A new install picks German on German Windows and English everywhere else. |
-| Tray | Control the timer from the tray menu. Closing the window keeps the app running. |
-| Safe by default | Standby pauses the timer. After a crash or shutdown, a running session ends at the last sign of life, so the downtime doesn't end up on an invoice. |
+| Tray | Control the timer from the tray menu. With several timers, each one gets its own submenu, and you can pause or stop all of them at once. Closing the window keeps the app running. |
+| Safe by default | Standby pauses every timer. After a crash or shutdown, running sessions end at the last sign of life, so the downtime doesn't end up on an invoice. |
 
 ## A tour
 
@@ -54,6 +55,16 @@ Your timer stays one hover away, whatever app is in front.
 <img src="docs/images/widget-demo.gif" alt="Animation: the widget slides out on hover, then the timer is started, paused and stopped">
 
 <img src="docs/images/widget-states.png" alt="The widget closed, opened and showing the project list">
+
+### Several projects at once
+
+As soon as a timer runs, a small plus shows up next to the project name. Click it, pick a project, press start. The first timer keeps running.
+
+<img src="docs/images/widget-parallel.png" alt="The widget with the plus list open, with three timers as colored dots, and closed with three small dots on the handle">
+
+Each timer is one dot in the same row, and only the project in front shows its name. Click a dot and the buttons control that project. A hollow dot is paused. Hover a dot to see the project and its time. The closed widget shows one tiny dot per timer. The Timer page has the same dots and plus next to the project picker.
+
+Picking a different project from the list still saves the current session and starts a new one. The plus is the way to add one next to it.
 
 ### Timer
 
@@ -128,6 +139,8 @@ The app keeps a backup next to it and refreshes that backup on every launch. Uni
 
 - A session counts completely toward the day it started, even if it runs past midnight or into the next month. That keeps every total identical across all views.
 - Stopping within one second discards the run as a misclick.
+- Each project can have one timer, and at most five run at the same time.
+- Parallel timers each count in full. Two projects tracked for the same hour add up to two hours in reports and on invoices. Edit the sessions if a client shouldn't pay for the overlap.
 - Hourly rates apply to all reports of a project, including past sessions.
 - Amounts are always in euros and net of tax.
 - If a period has more than eight projects, the smallest ones are grouped as "Other" in the chart.
@@ -167,6 +180,7 @@ Several UI components are adapted from the [21st.dev](https://21st.dev) communit
 | [Dialog](https://21st.dev/@originui/components/dialog) | originui |
 | [Switch](https://21st.dev/@halaska-studio/components/switch) | halaska-studio |
 | [Copy Button](https://21st.dev/@motiondotdev/components/motion-copy-button) | motiondotdev |
+| [Expandable Tabs](https://21st.dev/@rjcuff2000/components/expandable-tabs) | rjcuff2000 (easeUI) |
 
 If you're one of these authors and want your credit or code changed, please open an issue.
 
