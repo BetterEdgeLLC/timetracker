@@ -22,13 +22,13 @@ describe('Timer', () => {
   it('startet mit dem Standardnamen aus Projekt und Datum', () => {
     const data = timer.start(withProjects(), T0)
     expect(data.active?.status).toBe('running')
-    expect(data.active?.name).toBe('Alpha · 09.11.2026')
+    expect(data.active?.name).toBe('Alpha - 09.11.2026')
   })
 
   it('benennt neue Sessions in der gewählten Sprache', () => {
     const base = withProjects()
     const english = { ...base, settings: { ...base.settings, language: 'en' as const } }
-    expect(timer.start(english, T0).active?.name).toBe('Alpha · 09 Nov 2026')
+    expect(timer.start(english, T0).active?.name).toBe('Alpha - 09 Nov 2026')
   })
 
   it('startet nicht ohne gewähltes Projekt und nicht mit archiviertem Projekt', () => {
@@ -65,7 +65,7 @@ describe('Timer', () => {
   it('fällt bei leerem Namen auf den Standardnamen zurück', () => {
     let data = timer.start(withProjects(), T0)
     data = timer.renameActive(data, '   ')
-    expect(timer.stop(data, T0 + MIN, makeId).session?.name).toBe('Alpha · 09.11.2026')
+    expect(timer.stop(data, T0 + MIN, makeId).session?.name).toBe('Alpha - 09.11.2026')
   })
 
   it('speichert beim Projektwechsel die alte Session und läuft im neuen Projekt weiter', () => {

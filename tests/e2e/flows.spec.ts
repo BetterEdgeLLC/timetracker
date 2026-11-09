@@ -52,7 +52,7 @@ test('alle Abläufe in der echten App', async ({}, info) => {
     await expect(clock).toHaveAttribute('data-status', 'idle')
     await r.main.getByTestId('timer-start').click()
     await expect(clock).toHaveAttribute('data-status', 'running')
-    await expect(r.main.getByTestId('timer-name')).toHaveValue(/^Acme · \d{2}\.\d{2}\.\d{4}$/)
+    await expect(r.main.getByTestId('timer-name')).toHaveValue(/^Acme - \d{2}\.\d{2}\.\d{4}$/)
     await pause(1300)
     await r.main.getByTestId('timer-pause').click()
     await expect(clock).toHaveAttribute('data-status', 'paused')
@@ -302,7 +302,7 @@ test('alle Abläufe in der echten App', async ({}, info) => {
 
     await go(r.main, 'timer')
     await r.main.getByTestId('timer-start').click()
-    await expect(r.main.getByTestId('timer-name')).toHaveValue(/^Beta · \d{2} [A-Z][a-z]{2} \d{4}$/)
+    await expect(r.main.getByTestId('timer-name')).toHaveValue(/^Beta - \d{2} [A-Z][a-z]{2} \d{4}$/)
     await pause(1100)
     await r.main.getByTestId('timer-stop').click()
     await expect(r.main.getByTestId('timer-clock')).toHaveAttribute('data-status', 'idle')

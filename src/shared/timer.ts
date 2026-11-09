@@ -8,7 +8,7 @@ export const MIN_SESSION_MS = 1000
 export const RECOVERY_GRACE_MS = 120_000
 
 export function defaultSessionName(projectName: string, timestamp: number, lang: Language): string {
-  return `${projectName} · ${formatDate(timestamp, lang)}`
+  return `${projectName} - ${formatDate(timestamp, lang)}`
 }
 
 export function segmentsMs(segments: Segment[]): number {
