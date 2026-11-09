@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { endOfMonth, startOfMonth } from 'date-fns'
 import { ChevronLeft, ChevronRight, Download } from 'lucide-react'
 import { toast } from 'sonner'
-import { csvStyleFor, exportFileName, sessionsCsv, tableCsv, type CsvStyle } from '@shared/csv'
+import { csvStyleFor, exportFileName, sessionRows, sessionsCsv, tableCsv, tableRows, type CsvStyle } from '@shared/csv'
 import { euro, hm, hoursText, moneyText } from '@shared/format'
 import { resolvePeriod, shiftAnchor, type PeriodMode } from '@shared/period'
 import {
@@ -15,6 +15,7 @@ import {
   type ReportRow
 } from '@shared/report'
 import type { AppData, RoundingMinutes } from '@shared/types'
+import { ClipboardExport, type ClipboardKind } from '@/components/ClipboardExport'
 import { AnimatedSelect } from '@/components/ui/animated-select'
 import { Button, IconButton } from '@/components/ui/button'
 import { DateRangePicker, type DateRange } from '@/components/ui/date-range-picker'
@@ -113,6 +114,13 @@ export function ReportsPage({ state }: { state: AppData }): React.JSX.Element {
     } catch (e) {
       toast.error(errorText(e))
     }
+  }
+
+  const clipboardRows = (kind: ClipboardKind, projectIds: string[], style: CsvStyle): string[][] => {
+    const picked = inPeriod.filter((s) => projectIds.includes(s.projectId))
+    return kind === 'table'
+      ? tableRows(buildRows(picked, projects, settings.rounding, group, lang), group, lang, style)
+      : sessionRows(picked, projects, settings.rounding, lang, style)
   }
 
   const header = periodHeader[group]
@@ -256,6 +264,18 @@ export function ReportsPage({ state }: { state: AppData }): React.JSX.Element {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <SegmentedTabs options={groups} value={group} onChange={setGroup} label={m.reports.groupBy} testId="group" />
           <div className="flex gap-2">
+            <ClipboardExport
+              projects={legend.map((row) => ({
+                id: row.project?.id ?? row.key.slice(1),
+                name: row.project?.name ?? deleted,
+                color: row.project ? colorOf(row.project) : undefined,
+                ms: row.ms
+              }))}
+              preselected={selected}
+              periodLabel={range.label}
+              groupLabel={groups.find((g) => g.value === group)?.label ?? ''}
+              build={clipboardRows}
+            />
             <Button
               data-testid="export-table"
               disabled={rows.length === 0}

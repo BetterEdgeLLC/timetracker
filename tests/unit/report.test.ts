@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { csvCell, csvStyleFor, exportFileName, sessionsCsv, tableCsv } from '../../src/shared/csv'
+import { csvCell, csvStyleFor, exportFileName, sessionRows, sessionsCsv, tableCsv, tableRows, toTsv, tsvCell } from '../../src/shared/csv'
 import { formatDate, hm, hoursText } from '../../src/shared/format'
 import { initialLanguage, messages } from '../../src/shared/i18n'
 import { resolvePeriod } from '../../src/shared/period'
@@ -105,6 +105,44 @@ describe('Auswertung', () => {
     const week = resolvePeriod('week', new Date(2026, 10, 15), null, null, Date.now(), 'en')
     expect(week.label).toBe('Wk 46, 09 Nov to 15 Nov 2026')
     expect(resolvePeriod('month', new Date(2026, 2, 15), null, null, Date.now(), 'en').label).toBe('March 2026')
+  })
+})
+
+describe('Zwischenablage', () => {
+  it('trennt Spalten mit Tabs und Zeilen mit CRLF, ohne Umbruch am Ende', () => {
+    expect(toTsv([['a', 'b'], ['1', '2']])).toBe('a\tb\r\n1\t2')
+  })
+
+  it('hält Tabs und Zeilenumbrüche aus Namen aus der Tabellenstruktur heraus', () => {
+    expect(tsvCell('Teil\t1\r\nTeil 2')).toBe('Teil 1 Teil 2')
+  })
+
+  it('entschärft Formeln auch hinter führendem Leerraum', () => {
+    expect(tsvCell('=SUMME(A1)')).toBe("'=SUMME(A1)")
+    expect(tsvCell('\t@cmd')).toBe("'@cmd")
+  })
+
+  it('maskiert ein führendes Anführungszeichen, damit Excel keine Zeilen zusammenzieht', () => {
+    expect(tsvCell('"Kunde" Workshop')).toBe('"""Kunde"" Workshop"')
+    expect(tsvCell('Kunde "A"')).toBe('Kunde "A"')
+  })
+
+  it('kopiert dieselben Zeilen wie der CSV-Export, nur mit Tabs', () => {
+    const rows = buildRows(sessions, [alpha, beta], NONE, 'project', 'de')
+    expect(toTsv(tableRows(rows, 'project', 'de', SEMI)) + '\r\n').toBe(
+      tableCsv(rows, 'project', 'de', SEMI).replaceAll(';', '\t')
+    )
+    expect(toTsv(sessionRows(sessions, [alpha, beta], NONE, 'de', SEMI)) + '\r\n').toBe(
+      sessionsCsv(sessions, [alpha, beta], NONE, 'de', SEMI).replaceAll(';', '\t')
+    )
+  })
+
+  it('nimmt bei Projektauswahl nur deren Sessions in Zeilen und Summe auf', () => {
+    const picked = sessions.filter((s) => s.projectId === 'b')
+    const lines = tableRows(buildRows(picked, [alpha, beta], NONE, 'project', 'de'), 'project', 'de', SEMI)
+    expect(lines).toHaveLength(3)
+    expect(lines[1][0]).toBe('Beta')
+    expect(lines[2]).toEqual(['Gesamt', '1', '1:00', '1,00', '', '0,00'])
   })
 })
 

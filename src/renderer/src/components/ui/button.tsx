@@ -15,7 +15,7 @@ export function Button({
   variant = 'outline',
   className,
   ...props
-}: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant }): React.JSX.Element {
+}: React.ComponentProps<'button'> & { variant?: Variant }): React.JSX.Element {
   return (
     <button
       type="button"

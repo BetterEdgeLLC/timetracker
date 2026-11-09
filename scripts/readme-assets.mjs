@@ -129,6 +129,7 @@ function installMock(initial) {
       window.__csv[name] = content
       return { saved: true, path: name }
     },
+    copyText: async () => undefined,
     openMain: async () => undefined,
     openDataFolder: async () => undefined,
     widgetIgnoreMouse: async () => undefined
@@ -257,6 +258,18 @@ const csv = {}
   await context.close()
 }
 
+// Fresh page again, with the copy popover open and one project deselected.
+{
+  const { context, page } = await open('index.html', data, { viewport: { width: 1280, height: 860 } })
+  await nav(page, 'reports')
+  await page.waitForTimeout(900)
+  await page.getByTestId('clipboard-trigger').click()
+  await page.getByTestId('clipboard-project').last().click()
+  await page.waitForTimeout(500)
+  await page.screenshot({ path: rawPath('clipboard') })
+  await context.close()
+}
+
 // Hero source: shorter window so the widget can sit beside it
 {
   const { context, page } = await open('index.html', running(data, NOW - (83 * MIN + 7000)), { viewport: { width: 1280, height: 860 } })
@@ -299,6 +312,7 @@ await framed('projects')
 await framed('settings')
 await framed('reports')
 await framed('reports-year')
+await framed('clipboard')
 
 await compose(
   'hero',

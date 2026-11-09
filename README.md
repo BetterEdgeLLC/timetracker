@@ -40,6 +40,7 @@ Timetracker starts with Windows by default and sits in the tray. You can turn th
 | Project filter | Click projects in the legend to focus the chart, totals and table on them. |
 | Billing | Hourly rate per project, net amounts in euros, optional rounding to 5, 6, 10, 15, 30 or 60 minutes, to the nearest step or always up. |
 | CSV export | Export the current table or every session in the period, ready for Excel and other spreadsheets. |
+| Copy to clipboard | Copy the same data without saving a file. Choose all projects or only some, then paste into Excel, Google Sheets or anywhere else. |
 | Languages | English and German, switchable in Settings. A new install picks German on German Windows and English everywhere else. |
 | Tray | Control the timer from the tray menu. Closing the window keeps the app running. |
 | Safe by default | Standby pauses the timer. After a crash or shutdown, a running session ends at the last sign of life, so the downtime doesn't end up on an invoice. |
@@ -103,6 +104,16 @@ You can download both example files: [`sample-report.csv`](docs/examples/sample-
 
 Column headers follow the app language. The separator and decimal mark follow your Windows region, so Excel splits the columns correctly: semicolon and decimal comma in Germany, comma and decimal point in the US.
 
+### Copy instead of export
+
+**Reports > Copy** puts the numbers on the clipboard without saving a file.
+
+<img src="docs/images/clipboard.png" alt="Copy popover in the reports window with table or sessions, a project checklist and a copy button">
+
+Choose **Table** for the report table with its current grouping and total row, or **Sessions** for every session with start, end and break. All projects are ticked by default. Untick the ones you don't need, or click **All projects** to clear the list and pick a few. A project filter set in the legend is the starting selection.
+
+The copy covers the period shown on the page and has the same columns and numbers as the CSV files. Columns are separated by tabs, so each value lands in its own cell in Excel and Google Sheets. Decimal marks follow your Windows region here too.
+
 ## Your data stays on your PC
 
 Timetracker has no account, no cloud and no analytics. Everything lives in one JSON file:
@@ -155,6 +166,7 @@ Several UI components are adapted from the [21st.dev](https://21st.dev) communit
 | [Date Range Picker](https://21st.dev/@kuratlielia/components/date-range-picker) | kuratlielia |
 | [Dialog](https://21st.dev/@originui/components/dialog) | originui |
 | [Switch](https://21st.dev/@halaska-studio/components/switch) | halaska-studio |
+| [Copy Button](https://21st.dev/@motiondotdev/components/motion-copy-button) | motiondotdev |
 
 If you're one of these authors and want your credit or code changed, please open an issue.
 

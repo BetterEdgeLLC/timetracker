@@ -30,9 +30,24 @@ export function toCsv(rows: string[][], separator: string): string {
   return rows.map((row) => row.map((cell) => csvCell(cell, separator)).join(separator)).join('\r\n') + '\r\n'
 }
 
+/**
+ * Zellen fürs Einfügen aus der Zwischenablage. Tabs und Zeilenumbrüche würden die Tabelle zerreißen,
+ * ein führendes Anführungszeichen liest Excel als Beginn eines mehrzeiligen Felds.
+ */
+export function tsvCell(value: string): string {
+  const flat = value.replace(/[\t\r\n]+/g, ' ').trim()
+  if (/^[=+\-@]/.test(flat)) return `'${flat}`
+  return flat.startsWith('"') ? `"${flat.replace(/"/g, '""')}"` : flat
+}
+
+/** Tabulatoren trennen die Spalten in Excel und Google Sheets unabhängig von der Windows-Region. */
+export function toTsv(rows: string[][]): string {
+  return rows.map((row) => row.map(tsvCell).join('\t')).join('\r\n')
+}
+
 const decimalText = (value: number, style: CsvStyle): string => value.toFixed(2).replace('.', style.decimal)
 
-export function tableCsv(rows: ReportRow[], groupBy: GroupBy, lang: Language, style: CsvStyle): string {
+export function tableRows(rows: ReportRow[], groupBy: GroupBy, lang: Language, style: CsvStyle): string[][] {
   const m = messages[lang]
   const periodHeader: Record<GroupBy, string | null> = {
     project: null,
@@ -71,16 +86,20 @@ export function tableCsv(rows: ReportRow[], groupBy: GroupBy, lang: Language, st
     '',
     money(t.cents)
   ]
-  return toCsv([header, ...body, footer], style.separator)
+  return [header, ...body, footer]
 }
 
-export function sessionsCsv(
+export function tableCsv(rows: ReportRow[], groupBy: GroupBy, lang: Language, style: CsvStyle): string {
+  return toCsv(tableRows(rows, groupBy, lang, style), style.separator)
+}
+
+export function sessionRows(
   sessions: Session[],
   projects: Project[],
   rounding: Rounding,
   lang: Language,
   style: CsvStyle
-): string {
+): string[][] {
   const m = messages[lang]
   const byId = new Map(projects.map((p) => [p.id, p]))
   const header = [
@@ -115,7 +134,17 @@ export function sessionsCsv(
       decimalText(amountCents(hundredths, rate) / 100, style)
     ]
   })
-  return toCsv([header, ...body], style.separator)
+  return [header, ...body]
+}
+
+export function sessionsCsv(
+  sessions: Session[],
+  projects: Project[],
+  rounding: Rounding,
+  lang: Language,
+  style: CsvStyle
+): string {
+  return toCsv(sessionRows(sessions, projects, rounding, lang, style), style.separator)
 }
 
 /** Dateiname nach dem Schema YYMMDD_Projekt_bezeichnung_v1. */

@@ -96,6 +96,7 @@ export interface TimetrackerApi {
   deleteSession(id: string): Promise<void>
   updateSettings(patch: Partial<Settings>): Promise<void>
   saveCsv(defaultName: string, content: string): Promise<SaveResult>
+  copyText(content: string): Promise<void>
   openMain(page?: MainPage): Promise<void>
   openDataFolder(): Promise<void>
   widgetIgnoreMouse(ignore: boolean): Promise<void>

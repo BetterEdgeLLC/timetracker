@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import {
   app,
   BrowserWindow,
+  clipboard,
   dialog,
   ipcMain,
   Menu,
@@ -335,6 +336,10 @@ function registerIpc(): void {
     if (result.canceled || !result.filePath) return { saved: false }
     writeFileSync(result.filePath, `﻿${content}`, 'utf8')
     return { saved: true, path: result.filePath }
+  })
+  handle('copyText', (_e, content) => {
+    if (typeof content !== 'string') throw new Error(m().error.exportMissing)
+    clipboard.writeText(content)
   })
   handle('openMain', (_e, page) => openMain(page as MainPage | undefined))
   handle('openDataFolder', () => shell.openPath(app.getPath('userData')))

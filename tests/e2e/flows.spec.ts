@@ -195,6 +195,43 @@ test('alle Abläufe in der echten App', async ({}, info) => {
     expect(sessions.split('\r\n').filter(Boolean)).toHaveLength(6)
   })
 
+  await test.step('Kopieren in die Zwischenablage: alle und einzelne Projekte', async () => {
+    const readClipboard = (): Promise<string> => r.app.evaluate(({ clipboard }) => clipboard.readText())
+    const popover = r.main.getByTestId('clipboard-popover')
+    await r.app.evaluate(({ clipboard }) => clipboard.writeText(''))
+
+    await r.main.getByTestId('clipboard-trigger').click()
+    await expect(r.main.getByTestId('clipboard-count')).toHaveText('2 von 2 Projekten')
+    await r.main.getByTestId('clipboard-copy').click()
+    await expect.poll(readClipboard).toContain('Projekt\tSessions\tErfasst (h:mm)\tAbrechenbar (h)\tStundensatz (EUR)\tBetrag netto (EUR)')
+    expect(await readClipboard()).toContain('Gesamt\t5\t')
+    await expect(r.main.getByTestId('clipboard-copy')).toHaveAttribute('data-copied', 'true')
+    await expect(popover).toHaveCount(0)
+
+    await r.main.getByTestId('clipboard-trigger').click()
+    await r.main.getByTestId('clipboard-all').click()
+    await expect(r.main.getByTestId('clipboard-count')).toHaveText('Kein Projekt gewählt')
+    await expect(r.main.getByTestId('clipboard-copy')).toBeDisabled()
+    await r.main.getByTestId('clipboard-project').filter({ hasText: 'Beta' }).click()
+    await expect(r.main.getByTestId('clipboard-all')).toHaveAttribute('aria-checked', 'mixed')
+    await r.main.getByTestId('clipboard-kind-sessions').click()
+    await r.main.getByTestId('clipboard-copy').click()
+    await expect.poll(readClipboard).toContain('Datum\tProjekt\tSession\tStart\tEnde')
+    const copied = (await readClipboard()).split('\r\n')
+    expect(copied).toHaveLength(2)
+    expect(copied[1]).toContain('Beta')
+    await expect(popover).toHaveCount(0)
+
+    // Der Filter der Seite ist die Vorauswahl beim Öffnen.
+    await r.main.getByTestId('legend-project').filter({ hasText: 'Acme' }).click()
+    await r.main.getByTestId('clipboard-trigger').click()
+    await expect(r.main.getByTestId('clipboard-count')).toHaveText('1 von 2 Projekten')
+    await r.main.keyboard.press('Escape')
+    await expect(popover).toHaveCount(0)
+    await expect(r.main.getByTestId('clipboard-trigger')).toBeFocused()
+    await r.main.getByTestId('legend-reset').click()
+  })
+
   await test.step('Fenster schließen lässt die App im Tray, Widget öffnet sie wieder', async () => {
     // BrowserWindow.close() entspricht dem Klick auf das X in der Titelleiste.
     await r.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w.getTitle() === 'Timetracker')?.close())

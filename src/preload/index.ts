@@ -30,6 +30,7 @@ const api: TimetrackerApi = {
   deleteSession: call('deleteSession'),
   updateSettings: call('updateSettings'),
   saveCsv: call('saveCsv'),
+  copyText: call('copyText'),
   openMain: call('openMain'),
   openDataFolder: call('openDataFolder'),
   widgetIgnoreMouse: call('widgetIgnoreMouse')
