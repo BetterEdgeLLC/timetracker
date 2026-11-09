@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { AnimatePresence, motion } from 'motion/react'
+import { useDeferredValue, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { motion } from 'motion/react'
 import { clock } from '@shared/format'
 import { focusedTimer } from '@shared/timer'
 import type { AppData, MainPage } from '@shared/types'
@@ -36,8 +36,15 @@ function RunningBadge({ state }: { state: AppData }): React.JSX.Element | null {
 function Shell({ state }: { state: AppData }): React.JSX.Element {
   const { m } = useI18n()
   const [page, setPage] = useState<MainPage>('timer')
+  // Die Tab-Pille reagiert sofort, die neue Seite rendert dahinter und hält sie nicht auf.
+  const shownPage = useDeferredValue(page)
+  const scrollRef = useRef<HTMLElement>(null)
 
   useEffect(() => window.api.onNavigate(setPage), [])
+
+  useLayoutEffect(() => {
+    scrollRef.current?.scrollTo(0, 0)
+  }, [shownPage])
 
   const pages: { value: MainPage; label: string }[] = [
     { value: 'timer', label: m.nav.timer },
@@ -60,23 +67,21 @@ function Shell({ state }: { state: AppData }): React.JSX.Element {
         {page !== 'timer' && <RunningBadge state={state} />}
       </header>
 
-      <main className="thin-scroll min-h-0 flex-1 overflow-y-auto">
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.div
-            key={page}
-            className="h-full"
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, transition: { duration: 0.08 } }}
-            transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-          >
-            {page === 'timer' && <TimerPage state={state} onGoToProjects={() => setPage('projects')} />}
-            {page === 'sessions' && <SessionsPage state={state} />}
-            {page === 'reports' && <ReportsPage state={state} />}
-            {page === 'projects' && <ProjectsPage state={state} />}
-            {page === 'settings' && <SettingsPage state={state} />}
-          </motion.div>
-        </AnimatePresence>
+      <main ref={scrollRef} className="page-scroll thin-scroll min-h-0 flex-1 overflow-y-auto">
+        {/* Nur Deckkraft: Jede Verschiebung erzeugt kurz Überhang und damit eine Scrollleiste, die den Inhalt versetzt. */}
+        <motion.div
+          key={shownPage}
+          className="h-full"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
+        >
+          {shownPage === 'timer' && <TimerPage state={state} onGoToProjects={() => setPage('projects')} />}
+          {shownPage === 'sessions' && <SessionsPage state={state} />}
+          {shownPage === 'reports' && <ReportsPage state={state} />}
+          {shownPage === 'projects' && <ProjectsPage state={state} />}
+          {shownPage === 'settings' && <SettingsPage state={state} />}
+        </motion.div>
       </main>
     </div>
   )
