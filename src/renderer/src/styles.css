@@ -1,0 +1,194 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/geist';
+
+@theme {
+  --color-bg: #09090b;
+  --color-surface: #111113;
+  --color-raised: #18181b;
+  --color-hover: #232327;
+  --color-line: rgba(255, 255, 255, 0.08);
+  --color-line-strong: rgba(255, 255, 255, 0.15);
+  --color-ink: #efeeea;
+  --color-ink-2: #b6b5af;
+  --color-ink-3: #8a8983;
+  --color-accent: #e2b77a;
+  --color-accent-ink: #1a1408;
+  --color-danger: #e66767;
+  --font-sans: 'Geist Variable', 'Segoe UI', sans-serif;
+  /* Zahlen laufen in Geist mit Tabellenziffern, die Mono-Nullen wirkten zu technisch. */
+  --font-mono: 'Geist Variable', 'Segoe UI', sans-serif;
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  cursor: default;
+}
+
+html.widget,
+html.widget body {
+  background: transparent;
+  overflow: hidden;
+}
+
+input {
+  user-select: text;
+}
+
+input[type='datetime-local']::-webkit-calendar-picker-indicator {
+  opacity: 0.5;
+}
+
+.drag {
+  -webkit-app-region: drag;
+}
+
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+
+/* Tailwinds transition-colors würde sonst transform aus der Übergangsliste werfen. */
+.press {
+  transition-property: color, background-color, border-color, opacity, transform !important;
+  transition-duration: 160ms;
+  transition-timing-function: ease-out;
+}
+
+.press:active {
+  transform: scale(0.97);
+}
+
+.font-mono {
+  font-variant-numeric: tabular-nums;
+}
+
+.thin-scroll::-webkit-scrollbar {
+  width: 10px;
+}
+
+.thin-scroll::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 8px;
+  background: var(--color-line-strong);
+  background-clip: padding-box;
+}
+
+.dialog-overlay,
+.dialog-content {
+  transition-duration: 180ms;
+  transition-timing-function: var(--ease-out-soft);
+  animation-duration: 180ms;
+  animation-timing-function: var(--ease-out-soft);
+  animation-fill-mode: both;
+}
+
+.dialog-content {
+  translate: -50% -50%;
+}
+
+.dialog-overlay[data-state='open'] {
+  animation-name: fade-in;
+}
+
+.dialog-overlay[data-state='closed'] {
+  animation-name: fade-out;
+}
+
+.dialog-content[data-state='open'] {
+  animation-name: dialog-in;
+}
+
+.dialog-content[data-state='closed'] {
+  animation-name: dialog-out;
+  animation-duration: 120ms;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+@keyframes dialog-out {
+  to {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+
+.bar-column {
+  transform-box: fill-box;
+  transform-origin: bottom;
+  animation: bar-grow 420ms var(--ease-out-soft) both;
+}
+
+@keyframes bar-grow {
+  from {
+    transform: scaleY(0);
+  }
+}
+
+.status-breathe {
+  animation: breathe 2.4s ease-in-out infinite;
+}
+
+@keyframes breathe {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.ring-spin {
+  transform-origin: center;
+  animation: ring-spin 7s linear infinite;
+}
+
+@keyframes ring-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar-column,
+  .ring-spin {
+    animation: none;
+  }
+
+  .status-breathe {
+    animation-duration: 6s;
+  }
+
+  .press:active {
+    transform: none;
+  }
+}

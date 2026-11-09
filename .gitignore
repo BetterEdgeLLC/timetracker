@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Build output and installers (installers go to GitHub Releases)
+out/
+dist/
+release/
+
+# Test output, including generated test data
+test-results/
+playwright-report/
+coverage/
+
+# Secrets and machine-specific settings
+.env
+.env.*
+CLAUDE.local.md
+
+# Local tooling
+.claude/
+.planning/
+.playwright-mcp/
+.vscode/
+.idea/
+
+# Noise
+*.log
+*.tmp
+Thumbs.db
+Desktop.ini
+.DS_Store
