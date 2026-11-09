@@ -22,7 +22,14 @@ const de = {
     projects: 'Projekte',
     settings: 'Einstellungen'
   },
-  tray: { open: 'Timetracker öffnen', showWidget: 'Seiten-Widget anzeigen', quit: 'Beenden' },
+  tray: {
+    open: 'Timetracker öffnen',
+    showWidget: 'Seiten-Widget anzeigen',
+    quit: 'Beenden',
+    activeCount: (n: number) => `${n} Timer aktiv`,
+    pauseAll: 'Alle pausieren',
+    stopAll: 'Alle stoppen'
+  },
   field: { id: 'ID', projectName: 'Projektname', sessionName: 'Sessionname', fileName: 'Dateiname' },
   error: {
     missing: (field: string) => `${field} fehlt`,
@@ -64,6 +71,8 @@ const de = {
   timer: {
     emptyHint: 'Zeit läuft immer auf ein Projekt. Lege dein erstes an, dann geht es los.',
     autoName: 'Name kommt automatisch, du kannst ihn jederzeit ändern',
+    addParallel: 'Weiteres Projekt tracken',
+    activeTimers: 'Aktive Timer',
     today: 'Heute',
     todayEmpty: 'Heute noch nichts erfasst.'
   },
@@ -227,7 +236,14 @@ const en: Messages = {
     projects: 'Projects',
     settings: 'Settings'
   },
-  tray: { open: 'Open Timetracker', showWidget: 'Show side widget', quit: 'Quit' },
+  tray: {
+    open: 'Open Timetracker',
+    showWidget: 'Show side widget',
+    quit: 'Quit',
+    activeCount: (n) => `${n} timers active`,
+    pauseAll: 'Pause all',
+    stopAll: 'Stop all'
+  },
   field: { id: 'ID', projectName: 'Project name', sessionName: 'Session name', fileName: 'File name' },
   error: {
     missing: (field) => `${field} is missing`,
@@ -269,6 +285,8 @@ const en: Messages = {
   timer: {
     emptyHint: 'Time always runs on a project. Create your first one to get going.',
     autoName: 'The name is set automatically, you can change it anytime',
+    addParallel: 'Track another project',
+    activeTimers: 'Active timers',
     today: 'Today',
     todayEmpty: 'Nothing tracked today.'
   },

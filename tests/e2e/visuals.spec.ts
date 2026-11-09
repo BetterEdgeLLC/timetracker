@@ -98,3 +98,31 @@ test('Screenshots mit Beispieldaten', async ({}, info) => {
 
   await close(r, info)
 })
+
+test('Widget mit fünf Timern und langen Namen', async ({}, info) => {
+  const dataDir = newDataDir()
+  const data = seed()
+  const now = Date.now()
+  const long = data.projects.map((p, i) => (i === 4 ? { ...p, name: 'Lumen Relaunch Gesamtprojekt Phase Zwei und Drei' } : p))
+  const timers = long.map((p, i) => ({
+    status: i === 1 ? ('paused' as const) : ('running' as const),
+    projectId: p.id,
+    name: p.name,
+    segments: i === 1 ? [{ start: now - HOUR, end: now - HOUR / 2 }] : [],
+    openSince: i === 1 ? null : now - (i + 1) * 600_000
+  }))
+  writeFileSync(
+    resolve(dataDir, 'timetracker-data.json'),
+    JSON.stringify({ ...data, projects: long, selectedProjectId: 'p4', timers, lastSeenAt: now })
+  )
+  const r = await launch(dataDir, info)
+  await expect(r.widget.getByTestId('widget-handle')).toHaveAttribute('data-timers', '5')
+  await r.widget.getByTestId('widget-handle').hover()
+  await expect(r.widget.getByTestId('widget-root')).toHaveAttribute('data-open', 'true')
+  await expect(r.widget.getByTestId('widget-add')).toHaveCount(0)
+  await r.widget.waitForTimeout(700)
+  await r.widget.screenshot({ path: resolve(shots, '23-widget-fuenf.png'), omitBackground: true })
+  await r.main.waitForTimeout(300)
+  await r.main.screenshot({ path: resolve(shots, '24-timer-fuenf.png') })
+  await close(r, info, 'trace-fuenf')
+})

@@ -170,34 +170,77 @@ function applyAutostart(): void {
 }
 
 function trayIcon(): Electron.NativeImage {
-  const running = store.data.active?.status === 'running'
+  const running = store.data.timers.some((t) => t.status === 'running')
   return nativeImage.createFromPath(resource(running ? 'tray-running.png' : 'tray-idle.png'))
+}
+
+/** Bei mehreren Timern bekommt jeder ein eigenes Untermenü, statt die Knöpfe zu vervielfachen. */
+function parallelTrayItems(): Electron.MenuItemConstructorOptions[] {
+  const { timers, projects } = store.data
+  const t = m()
+  return [
+    { label: t.tray.activeCount(timers.length), enabled: false },
+    { type: 'separator' },
+    ...timers.map((item): Electron.MenuItemConstructorOptions => ({
+      label: `${projects.find((p) => p.id === item.projectId)?.name ?? t.common.project} · ${t.status[item.status]}`,
+      submenu: [
+        item.status === 'paused'
+          ? { label: t.action.resume, click: () => commit(timer.start(store.data, Date.now(), item.projectId)) }
+          : { label: t.action.pause, click: () => commit(timer.pause(store.data, Date.now(), item.projectId)) },
+        { label: t.action.stop, click: () => stopTimer(item.projectId) }
+      ]
+    })),
+    { type: 'separator' },
+    {
+      label: t.tray.pauseAll,
+      enabled: timers.some((item) => item.status === 'running'),
+      click: () => commit(timer.pauseAll(store.data, Date.now()))
+    },
+    { label: t.tray.stopAll, click: () => commit(timer.stopAll(store.data, Date.now(), randomUUID)) }
+  ]
+}
+
+function singleTrayItems(): Electron.MenuItemConstructorOptions[] {
+  const { timers, selectedProjectId, projects } = store.data
+  const active = timers[0]
+  const projectId = active?.projectId ?? selectedProjectId ?? undefined
+  const project = projects.find((p) => p.id === projectId)
+  const t = m()
+  return [
+    { label: `${t.status[active?.status ?? 'idle']}${project ? ` · ${project.name}` : ''}`, enabled: false },
+    { type: 'separator' },
+    {
+      label: active?.status === 'paused' ? t.action.resume : t.action.start,
+      enabled: active?.status !== 'running' && Boolean(project),
+      click: () => commit(timer.start(store.data, Date.now(), projectId))
+    },
+    {
+      label: t.action.pause,
+      enabled: active?.status === 'running',
+      click: () => commit(timer.pause(store.data, Date.now(), projectId))
+    },
+    { label: t.action.stop, enabled: Boolean(active), click: () => stopTimer(projectId) }
+  ]
 }
 
 function refreshTray(): void {
   if (!tray) return
-  const { active, selectedProjectId, projects, settings } = store.data
-  const projectId = active?.projectId ?? selectedProjectId
-  const project = projects.find((p) => p.id === projectId)
+  const { timers, selectedProjectId, projects, settings } = store.data
   const t = m()
-  const status = t.status[active?.status ?? 'idle']
+  const projectId = timers[0]?.projectId ?? selectedProjectId
+  const project = projects.find((p) => p.id === projectId)
+  const status = t.status[timers[0]?.status ?? 'idle']
   tray.setImage(trayIcon())
-  tray.setToolTip(project ? `Timetracker: ${status} (${project.name})` : `Timetracker: ${status}`)
+  tray.setToolTip(
+    timers.length > 1
+      ? `Timetracker: ${t.tray.activeCount(timers.length)}`
+      : project
+        ? `Timetracker: ${status} (${project.name})`
+        : `Timetracker: ${status}`
+  )
   tray.setContextMenu(
     Menu.buildFromTemplate([
-      { label: `${status}${project ? ` · ${project.name}` : ''}`, enabled: false },
-      { type: 'separator' },
-      {
-        label: active?.status === 'paused' ? t.action.resume : t.action.start,
-        enabled: active?.status !== 'running' && Boolean(project),
-        click: () => commit(timer.start(store.data, Date.now()))
-      },
-      {
-        label: t.action.pause,
-        enabled: active?.status === 'running',
-        click: () => commit(timer.pause(store.data, Date.now()))
-      },
-      { label: t.action.stop, enabled: Boolean(active), click: () => stopTimer() },
+      ...(timers.length > 1 ? parallelTrayItems() : singleTrayItems()),
       { type: 'separator' },
       { label: t.tray.open, click: () => openMain() },
       {
@@ -218,8 +261,10 @@ function createTray(): void {
   refreshTray()
 }
 
-function stopTimer(): void {
-  commit(timer.stop(store.data, Date.now(), randomUUID).data)
+function stopTimer(projectId?: string): string | null {
+  const result = timer.stop(store.data, Date.now(), randomUUID, projectId)
+  commit(result.data)
+  return result.session?.id ?? null
 }
 
 function updateSettings(value: unknown): void {
@@ -238,6 +283,8 @@ function assertProject(id: string): void {
   if (!store.data.projects.some((p) => p.id === id)) throw new Error(m().error.projectNotFound)
 }
 
+const optionalId = (value: unknown): string | undefined => (value === undefined ? undefined : validate().id(value))
+
 function handle(channel: string, fn: (event: IpcMainInvokeEvent, ...args: unknown[]) => unknown): void {
   ipcMain.handle(channel, fn)
 }
@@ -245,17 +292,15 @@ function handle(channel: string, fn: (event: IpcMainInvokeEvent, ...args: unknow
 function registerIpc(): void {
   handle('getState', () => store.data)
   handle('getSystemLocale', () => app.getSystemLocale())
-  handle('start', (_e, projectId) =>
-    commit(timer.start(store.data, Date.now(), projectId === undefined ? undefined : validate().id(projectId)))
+  handle('start', (_e, projectId) => commit(timer.start(store.data, Date.now(), optionalId(projectId))))
+  handle('pause', (_e, projectId) => commit(timer.pause(store.data, Date.now(), optionalId(projectId))))
+  handle('stop', (_e, projectId) => stopTimer(optionalId(projectId)))
+  handle('switchProject', (_e, projectId, fromProjectId) =>
+    commit(timer.switchProject(store.data, Date.now(), validate().id(projectId), randomUUID, optionalId(fromProjectId)))
   )
-  handle('pause', () => commit(timer.pause(store.data, Date.now())))
-  handle('stop', () => stopTimer())
-  handle('switchProject', (_e, projectId) =>
-    commit(timer.switchProject(store.data, Date.now(), validate().id(projectId), randomUUID))
-  )
-  handle('renameActive', (_e, name) => {
+  handle('renameActive', (_e, name, projectId) => {
     if (typeof name !== 'string' || name.length > 200) throw new Error(m().error.invalidSessionName)
-    commit(timer.renameActive(store.data, name))
+    commit(timer.renameActive(store.data, name, optionalId(projectId)))
   })
 
   handle('createProject', (_e, value) => {
@@ -279,27 +324,29 @@ function registerIpc(): void {
     const projectId = validate().id(id)
     assertProject(projectId)
     const patch = validate().projectPatch(value)
-    if (patch.archived && store.data.active?.projectId === projectId) {
-      throw new Error(m().error.stopFirst)
-    }
-    commit({
-      ...store.data,
-      projects: store.data.projects.map((p) => (p.id === projectId ? { ...p, ...patch } : p)),
-      selectedProjectId:
-        patch.archived && store.data.selectedProjectId === projectId ? null : store.data.selectedProjectId
-    })
+    if (patch.archived && timer.timerFor(store.data, projectId)) throw new Error(m().error.stopFirst)
+    commit(
+      timer.settleFocus({
+        ...store.data,
+        projects: store.data.projects.map((p) => (p.id === projectId ? { ...p, ...patch } : p)),
+        selectedProjectId:
+          patch.archived && store.data.selectedProjectId === projectId ? null : store.data.selectedProjectId
+      })
+    )
   })
   handle('deleteProject', (_e, id) => {
     const projectId = validate().id(id)
-    if (store.data.active?.projectId === projectId) throw new Error(m().error.stopFirst)
+    if (timer.timerFor(store.data, projectId)) throw new Error(m().error.stopFirst)
     if (store.data.sessions.some((s) => s.projectId === projectId)) {
       throw new Error(m().error.archiveOnly)
     }
-    commit({
-      ...store.data,
-      projects: store.data.projects.filter((p) => p.id !== projectId),
-      selectedProjectId: store.data.selectedProjectId === projectId ? null : store.data.selectedProjectId
-    })
+    commit(
+      timer.settleFocus({
+        ...store.data,
+        projects: store.data.projects.filter((p) => p.id !== projectId),
+        selectedProjectId: store.data.selectedProjectId === projectId ? null : store.data.selectedProjectId
+      })
+    )
   })
 
   handle('createSession', (_e, value) => {
@@ -359,7 +406,7 @@ function boot(): void {
   if (firstRun && !store.warning) {
     store.data.settings.language = initialLanguage(app.getSystemLocale())
   }
-  store.data = { ...timer.recover(store.data, Date.now()), lastSeenAt: Date.now() }
+  store.data = { ...timer.settleFocus(timer.recover(store.data, Date.now())), lastSeenAt: Date.now() }
   store.schedule()
 
   Menu.setApplicationMenu(null)
@@ -376,7 +423,7 @@ function boot(): void {
   }, HEARTBEAT_MS)
 
   // Im Standby läuft keine Arbeitszeit weiter.
-  powerMonitor.on('suspend', () => commit(timer.pause(store.data, Date.now())))
+  powerMonitor.on('suspend', () => commit(timer.pauseAll(store.data, Date.now())))
   powerMonitor.on('shutdown', () => persistNow())
   for (const event of ['display-added', 'display-removed', 'display-metrics-changed'] as const) {
     screen.on(event as 'display-added', placeWidget)

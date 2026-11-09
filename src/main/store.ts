@@ -1,5 +1,5 @@
 import { copyFileSync, existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
-import { DEFAULT_SETTINGS, emptyData, type AppData } from '../shared/types'
+import { DEFAULT_SETTINGS, emptyData, type ActiveTimer, type AppData } from '../shared/types'
 
 const SAVE_DELAY_MS = 200
 
@@ -15,8 +15,14 @@ export function migrateLegacyData(file: string, legacyFile: string): boolean {
   return true
 }
 
+/**
+ * Bis Version 1.2 gab es genau einen Timer im Feld `active`. Die Dateiversion bleibt 1, damit ältere Builds
+ * Projekte und Sessions weiter lesen. Laufende Timer gehen bei einem Downgrade verloren, gespeicherte Zeiten nicht.
+ */
+type StoredData = Partial<AppData> & { active?: ActiveTimer | null }
+
 function parse(file: string): AppData {
-  const raw = JSON.parse(readFileSync(file, 'utf8')) as Partial<AppData>
+  const { active, ...raw } = JSON.parse(readFileSync(file, 'utf8')) as StoredData
   if (raw.version !== 1 || !Array.isArray(raw.projects) || !Array.isArray(raw.sessions)) {
     throw new Error('Unknown data format')
   }
@@ -24,6 +30,8 @@ function parse(file: string): AppData {
   return {
     ...base,
     ...raw,
+    timers: Array.isArray(raw.timers) ? raw.timers : active ? [active] : [],
+    selectedProjectId: active?.projectId ?? raw.selectedProjectId ?? null,
     settings: {
       ...DEFAULT_SETTINGS,
       ...raw.settings,

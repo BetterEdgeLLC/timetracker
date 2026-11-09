@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { clock } from '@shared/format'
+import { focusedTimer } from '@shared/timer'
 import type { AppData, MainPage } from '@shared/types'
 import { Mark } from './components/Mark'
 import { SegmentedTabs } from './components/ui/segmented-tabs'
@@ -13,14 +14,21 @@ import { SettingsPage } from './pages/SettingsPage'
 import { TimerPage } from './pages/TimerPage'
 
 function RunningBadge({ state }: { state: AppData }): React.JSX.Element | null {
-  const elapsed = useElapsed(state.active)
-  if (!state.active) return null
-  const project = state.projects.find((p) => p.id === state.active?.projectId)
+  const shown = focusedTimer(state) ?? state.timers[0] ?? null
+  const elapsed = useElapsed(shown)
+  if (!shown) return null
+  const project = state.projects.find((p) => p.id === shown.projectId)
+  const others = state.timers.length - 1
   return (
     <div className="flex items-center gap-2 text-[12px] text-ink-2" data-testid="header-running">
       {project && <span className="size-2 rounded-full" style={{ background: colorOf(project) }} />}
       <span className="max-w-28 truncate">{project?.name}</span>
       <span className="font-mono tabular-nums text-ink">{clock(elapsed)}</span>
+      {others > 0 && (
+        <span className="font-mono tabular-nums text-ink-3" data-testid="header-running-more">
+          +{others}
+        </span>
+      )}
     </div>
   )
 }

@@ -54,8 +54,10 @@ export interface AppData {
   projects: Project[]
   sessions: Session[]
   settings: Settings
+  /** Das Projekt im Vordergrund. Hat es einen Timer, ist das der Tab, den die Knöpfe steuern. */
   selectedProjectId: string | null
-  active: ActiveTimer | null
+  /** Laufende und pausierte Timer in Startreihenfolge, höchstens einer pro Projekt. */
+  timers: ActiveTimer[]
   lastSeenAt: number
 }
 
@@ -84,10 +86,11 @@ export interface TimetrackerApi {
   onState(listener: (state: AppData) => void): () => void
   onNavigate(listener: (page: MainPage) => void): () => void
   start(projectId?: string): Promise<void>
-  pause(): Promise<void>
-  stop(): Promise<void>
-  switchProject(projectId: string): Promise<void>
-  renameActive(name: string): Promise<void>
+  pause(projectId?: string): Promise<void>
+  /** Liefert die Id der gespeicherten Session, null bei einem Fehlklick. */
+  stop(projectId?: string): Promise<string | null>
+  switchProject(projectId: string, fromProjectId?: string): Promise<void>
+  renameActive(name: string, projectId?: string): Promise<void>
   createProject(input: ProjectInput): Promise<Project>
   updateProject(id: string, patch: Partial<ProjectInput> & { archived?: boolean }): Promise<void>
   deleteProject(id: string): Promise<void>
@@ -116,7 +119,7 @@ export function emptyData(now: number): AppData {
     sessions: [],
     settings: { ...DEFAULT_SETTINGS, rounding: { ...DEFAULT_SETTINGS.rounding } },
     selectedProjectId: null,
-    active: null,
+    timers: [],
     lastSeenAt: now
   }
 }

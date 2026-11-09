@@ -6,6 +6,8 @@ import type { ActiveTimer, AppData, Language, Project, Segment, Session } from '
 export const MIN_SESSION_MS = 1000
 /** Ohne Lebenszeichen über diese Dauer gilt die App als abgestürzt oder beendet. */
 export const RECOVERY_GRACE_MS = 120_000
+/** Mehr passt nicht ruhig in die Kopfzeile des Widgets. */
+export const MAX_TIMERS = 5
 
 export function defaultSessionName(projectName: string, timestamp: number, lang: Language): string {
   return `${projectName} - ${formatDate(timestamp, lang)}`
@@ -24,54 +26,105 @@ function findProject(data: AppData, id: string | null | undefined): Project | un
   return id ? data.projects.find((p) => p.id === id && !p.archived) : undefined
 }
 
+export function timerFor(data: AppData, projectId: string | null | undefined): ActiveTimer | undefined {
+  return projectId ? data.timers.find((t) => t.projectId === projectId) : undefined
+}
+
+/** Der Timer im Vordergrund, sofern das gewählte Projekt einen hat. */
+export function focusedTimer(data: AppData): ActiveTimer | undefined {
+  return timerFor(data, data.selectedProjectId)
+}
+
+/** Projekte, die noch parallel gestartet werden können. */
+export function freeProjects(data: AppData): Project[] {
+  return data.projects.filter((p) => !p.archived && !timerFor(data, p.id))
+}
+
+function select(data: AppData, projectId: string): AppData {
+  return data.selectedProjectId === projectId ? data : { ...data, selectedProjectId: projectId }
+}
+
+function replaceTimer(data: AppData, next: ActiveTimer): AppData {
+  return { ...data, timers: data.timers.map((t) => (t.projectId === next.projectId ? next : t)) }
+}
+
+/** Läuft etwas, darf der Vordergrund nicht auf einem Projekt ohne Timer stehen bleiben. */
+export function settleFocus(data: AppData): AppData {
+  const last = data.timers.at(-1)
+  return !last || focusedTimer(data) ? data : select(data, last.projectId)
+}
+
+/** Startet einen neuen Timer oder setzt einen pausierten fort. Der Vordergrund wechselt nur beim Neustart. */
 export function start(data: AppData, now: number, projectId?: string): AppData {
-  if (data.active?.status === 'running') return data
-  if (data.active?.status === 'paused') {
-    return { ...data, active: { ...data.active, status: 'running', openSince: now } }
+  const id = projectId ?? data.selectedProjectId
+  const existing = timerFor(data, id)
+  if (existing) {
+    return existing.status === 'running' ? data : replaceTimer(data, { ...existing, status: 'running', openSince: now })
   }
-  const project = findProject(data, projectId ?? data.selectedProjectId)
-  if (!project) return data
+  const project = findProject(data, id)
+  if (!project || data.timers.length >= MAX_TIMERS) return data
   return {
     ...data,
     selectedProjectId: project.id,
-    active: {
-      status: 'running',
-      projectId: project.id,
-      name: defaultSessionName(project.name, now, data.settings.language),
-      segments: [],
-      openSince: now
-    }
+    timers: [
+      ...data.timers,
+      {
+        status: 'running',
+        projectId: project.id,
+        name: defaultSessionName(project.name, now, data.settings.language),
+        segments: [],
+        openSince: now
+      }
+    ]
   }
 }
 
-export function pause(data: AppData, now: number, at: number = now): AppData {
-  const active = data.active
-  if (active?.status !== 'running' || active.openSince === null) return data
-  const end = Math.max(active.openSince, at)
-  const segments = end > active.openSince ? [...active.segments, { start: active.openSince, end }] : active.segments
-  return { ...data, active: { ...active, status: 'paused', segments, openSince: null } }
+function paused(timer: ActiveTimer, at: number): ActiveTimer {
+  if (timer.status !== 'running' || timer.openSince === null) return timer
+  const end = Math.max(timer.openSince, at)
+  const segments = end > timer.openSince ? [...timer.segments, { start: timer.openSince, end }] : timer.segments
+  return { ...timer, status: 'paused', segments, openSince: null }
+}
+
+export function pause(data: AppData, now: number, projectId?: string): AppData {
+  const timer = timerFor(data, projectId ?? data.selectedProjectId)
+  return timer?.status === 'running' ? replaceTimer(data, paused(timer, now)) : data
+}
+
+export function pauseAll(data: AppData, now: number): AppData {
+  if (!data.timers.some((t) => t.status === 'running')) return data
+  return { ...data, timers: data.timers.map((t) => paused(t, now)) }
 }
 
 export function stop(
   data: AppData,
   now: number,
-  makeId: () => string
+  makeId: () => string,
+  projectId?: string
 ): { data: AppData; session: Session | null } {
-  const paused = pause(data, now)
-  const active = paused.active
-  if (!active) return { data, session: null }
-  const cleared: AppData = { ...paused, active: null }
-  if (segmentsMs(active.segments) < MIN_SESSION_MS) return { data: cleared, session: null }
+  const id = projectId ?? data.selectedProjectId
+  const timer = timerFor(data, id)
+  if (!timer) return { data, session: null }
+  const finished = paused(timer, now)
+  const timers = data.timers.filter((t) => t !== timer)
+  // War es der Vordergrund, übernimmt der zuletzt gestartete der übrigen Timer.
+  const next = data.selectedProjectId === id ? (timers.at(-1)?.projectId ?? id) : data.selectedProjectId
+  const cleared: AppData = { ...data, timers, selectedProjectId: next }
+  if (segmentsMs(finished.segments) < MIN_SESSION_MS) return { data: cleared, session: null }
   const session: Session = {
     id: makeId(),
-    projectId: active.projectId,
+    projectId: finished.projectId,
     name:
-      active.name.trim() ||
-      defaultSessionName(projectName(data, active.projectId), active.segments[0].start, data.settings.language),
-    segments: active.segments,
+      finished.name.trim() ||
+      defaultSessionName(projectName(data, finished.projectId), finished.segments[0].start, data.settings.language),
+    segments: finished.segments,
     createdAt: now
   }
   return { data: { ...cleared, sessions: [...cleared.sessions, session] }, session }
+}
+
+export function stopAll(data: AppData, now: number, makeId: () => string): AppData {
+  return data.timers.reduce((current, t) => stop(current, now, makeId, t.projectId).data, data)
 }
 
 function projectName(data: AppData, id: string): string {
@@ -79,27 +132,34 @@ function projectName(data: AppData, id: string): string {
 }
 
 /**
- * Projektwechsel: Die laufende Session bleibt beim alten Projekt und wird gespeichert.
- * Lief der Timer, startet sofort eine neue Session im neuen Projekt.
+ * Projektwechsel in einem Tab: Die laufende Session bleibt beim alten Projekt und wird gespeichert.
+ * Lief der Timer, startet sofort eine neue Session im neuen Projekt. Hat das Ziel schon einen Timer,
+ * wechselt nur der Vordergrund und kein Timer wird angefasst.
  */
-export function switchProject(data: AppData, now: number, projectId: string, makeId: () => string): AppData {
+export function switchProject(
+  data: AppData,
+  now: number,
+  projectId: string,
+  makeId: () => string,
+  fromProjectId?: string
+): AppData {
   if (!findProject(data, projectId)) return data
-  if (!data.active) return { ...data, selectedProjectId: projectId }
-  if (data.active.projectId === projectId) return data
-  const wasRunning = data.active.status === 'running'
-  const stopped = stop(data, now, makeId).data
+  if (timerFor(data, projectId)) return select(data, projectId)
+  const current = timerFor(data, fromProjectId ?? data.selectedProjectId)
+  if (!current) return select(data, projectId)
+  const wasRunning = current.status === 'running'
+  const stopped = stop(data, now, makeId, current.projectId).data
   const selected = { ...stopped, selectedProjectId: projectId }
   return wasRunning ? start(selected, now, projectId) : selected
 }
 
-export function renameActive(data: AppData, name: string): AppData {
-  return data.active ? { ...data, active: { ...data.active, name } } : data
+export function renameActive(data: AppData, name: string, projectId?: string): AppData {
+  const timer = timerFor(data, projectId ?? data.selectedProjectId)
+  return timer ? replaceTimer(data, { ...timer, name }) : data
 }
 
 /** Nach Absturz oder Herunterfahren: Zeit endet beim letzten Lebenszeichen, nicht beim Neustart. */
 export function recover(data: AppData, now: number): AppData {
-  const active = data.active
-  if (active?.status !== 'running') return data
   if (now - data.lastSeenAt <= RECOVERY_GRACE_MS) return data
-  return pause(data, now, data.lastSeenAt)
+  return pauseAll(data, data.lastSeenAt)
 }

@@ -38,7 +38,8 @@ export function AnimatedSelect({
   placeholder,
   label,
   className,
-  testId
+  testId,
+  triggerIcon
 }: {
   options: SelectOption[]
   value: string | null
@@ -47,6 +48,8 @@ export function AnimatedSelect({
   label: string
   className?: string
   testId?: string
+  /** Macht aus dem Auslöser einen runden Icon-Knopf. Die Liste bekommt dann eine feste Breite. */
+  triggerIcon?: React.ReactNode
 }): React.JSX.Element {
   const { m } = useI18n()
   const [open, setOpen] = useState(false)
@@ -103,13 +106,23 @@ export function AnimatedSelect({
         aria-label={label}
         data-testid={testId}
         onClick={toggle}
-        className="press flex h-10 w-full items-center justify-between gap-3 rounded-xl border border-line bg-raised px-3.5 text-[13px] text-ink outline-none transition-colors duration-150 hover:border-line-strong focus-visible:ring-2 focus-visible:ring-accent/60"
+        className={
+          triggerIcon
+            ? 'press flex size-7 items-center justify-center rounded-full text-ink-3 outline-none hover:bg-hover hover:text-ink focus-visible:ring-2 focus-visible:ring-accent/60'
+            : 'press flex h-10 w-full items-center justify-between gap-3 rounded-xl border border-line bg-raised px-3.5 text-[13px] text-ink outline-none transition-colors duration-150 hover:border-line-strong focus-visible:ring-2 focus-visible:ring-accent/60'
+        }
       >
-        <span className="flex min-w-0 items-center gap-2.5">
-          {selected?.color && <span className="size-2 shrink-0 rounded-full" style={{ background: selected.color }} />}
-          <span className={cn('truncate', !selected && 'text-ink-3')}>{selected?.label ?? placeholder}</span>
-        </span>
-        <Chevron open={open} />
+        {triggerIcon ?? (
+          <>
+            <span className="flex min-w-0 items-center gap-2.5">
+              {selected?.color && (
+                <span className="size-2 shrink-0 rounded-full" style={{ background: selected.color }} />
+              )}
+              <span className={cn('truncate', !selected && 'text-ink-3')}>{selected?.label ?? placeholder}</span>
+            </span>
+            <Chevron open={open} />
+          </>
+        )}
       </button>
 
       <AnimatePresence>
@@ -123,7 +136,10 @@ export function AnimatedSelect({
             exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.12 } }}
             transition={{ type: 'spring', stiffness: 460, damping: 34 }}
             style={{ transformOrigin: 'top center' }}
-            className="absolute left-0 right-0 top-full z-50 mt-1.5 max-h-64 overflow-y-auto rounded-xl border border-line-strong bg-raised p-1 shadow-2xl shadow-black/60"
+            className={cn(
+              'absolute left-0 top-full z-50 mt-1.5 max-h-64 overflow-y-auto rounded-xl border border-line-strong bg-raised p-1 shadow-2xl shadow-black/60',
+              triggerIcon ? 'w-56' : 'right-0'
+            )}
           >
             {options.length === 0 && <p className="px-3 py-2 text-[13px] text-ink-3">{m.common.noProjects}</p>}
             {options.map((option, i) => (

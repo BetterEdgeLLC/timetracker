@@ -4,27 +4,46 @@ import { AnimatePresence, motion, MotionConfig } from 'motion/react'
 import { Check, ChevronLeft, Maximize2, Pause, Play, Plus, Square } from 'lucide-react'
 import './styles.css'
 import { clock } from '@shared/format'
+import { freeProjects, MAX_TIMERS, timerFor } from '@shared/timer'
 import type { AppData } from '@shared/types'
 import { Mark } from './components/Mark'
 import { NameField } from './components/NameField'
 import { AnimateDigits } from './components/ui/animate-digits'
+import { AddTimerButton, TimerTabs, type TimerTab } from './components/ui/timer-tabs'
 import { ToolbarDock } from './components/ui/toolbar-dock'
-import { activeProjects, colorOf, useAppState, useElapsed } from './lib/app-state'
+import { activeProjects, colorOf, useAppState, useElapsed, useTimerView, type TimerView } from './lib/app-state'
 import { I18nProvider, useI18n } from './lib/i18n'
 import { cn } from './lib/utils'
 
 const PANEL_WIDTH = 288
 const CLOSE_DELAY_MS = 360
 const SAVED_VISIBLE_MS = 8000
+const SAVED_RECHECK_MS = 1000
 const DRAWER = { type: 'spring' as const, stiffness: 420, damping: 38, mass: 0.9 }
 const ICON = 'size-[17px]'
+/** Innenbreite des Panels und Platzbedarf der Kopfzeile, daraus ergibt sich die Länge des Projektnamens. */
+const PANEL_INNER = 256
+const COLLAPSED_TAB = 26
+const ADD_BUTTON = 30
+const ACTIVE_TAB_CHROME = 32
+const MAX_NAME = 210
+
+interface SavedInfo {
+  sessionId: string
+  projectId: string
+}
 
 function Handle({ state }: { state: AppData }): React.JSX.Element {
-  const status = state.active?.status
+  const status = state.timers.some((t) => t.status === 'running')
+    ? 'running'
+    : state.timers.length > 0
+      ? 'paused'
+      : undefined
   return (
     <div
       data-testid="widget-handle"
       data-status={status ?? 'idle'}
+      data-timers={state.timers.length}
       className="relative z-10 -mr-px flex h-[72px] w-[34px] items-center justify-center rounded-l-2xl border border-r-0 border-line-strong bg-surface shadow-[-3px_0_10px_rgba(0,0,0,0.35)]"
     >
       {status === 'paused' ? (
@@ -38,14 +57,37 @@ function Handle({ state }: { state: AppData }): React.JSX.Element {
       {status === 'running' && (
         <span className="status-breathe absolute right-1.5 top-2 size-1.5 rounded-full bg-accent" />
       )}
+      {state.timers.length > 1 && (
+        <span className="absolute inset-x-0 bottom-2 flex justify-center gap-[3px]" data-testid="widget-handle-pips">
+          {state.timers.map((timer) => {
+            const project = state.projects.find((p) => p.id === timer.projectId)
+            return (
+              <span
+                key={timer.projectId}
+                className={cn('size-[3px] rounded-full', timer.status === 'paused' && 'opacity-40')}
+                style={{ background: project ? colorOf(project) : undefined }}
+              />
+            )
+          })}
+        </span>
+      )}
     </div>
   )
 }
 
-function ProjectList({ state, onDone }: { state: AppData; onDone: () => void }): React.JSX.Element {
+function ProjectList({
+  state,
+  view,
+  mode,
+  onDone
+}: {
+  state: AppData
+  view: TimerView
+  mode: 'switch' | 'add'
+  onDone: () => void
+}): React.JSX.Element {
   const { m } = useI18n()
-  const projects = activeProjects(state)
-  const current = state.active?.projectId ?? state.selectedProjectId
+  const projects = mode === 'add' ? freeProjects(state) : activeProjects(state)
   return (
     <div className="flex h-full flex-col">
       <button
@@ -54,28 +96,36 @@ function ProjectList({ state, onDone }: { state: AppData; onDone: () => void }):
         className="press mb-1 flex h-8 items-center gap-1.5 self-start rounded-lg px-1.5 text-[12px] text-ink-3 hover:text-ink"
       >
         <ChevronLeft className="size-3.5" />
-        {m.common.chooseProject}
+        {mode === 'add' ? m.timer.addParallel : m.common.chooseProject}
       </button>
       <div className="thin-scroll -mr-1 min-h-0 flex-1 overflow-y-auto pr-1">
-        {projects.map((project, i) => (
-          <motion.button
-            key={project.id}
-            type="button"
-            data-testid="widget-project-option"
-            initial={{ opacity: 0, x: 8 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.18, delay: Math.min(i * 0.03, 0.15), ease: [0.22, 1, 0.36, 1] }}
-            onClick={() => {
-              void window.api.switchProject(project.id)
-              onDone()
-            }}
-            className="flex h-9 w-full items-center gap-2.5 rounded-lg px-2 text-left text-[13px] text-ink-2 transition-colors duration-100 hover:bg-hover hover:text-ink"
-          >
-            <span className="size-2 shrink-0 rounded-full" style={{ background: colorOf(project) }} />
-            <span className="min-w-0 flex-1 truncate">{project.name}</span>
-            {project.id === current && <Check className="size-3.5 shrink-0 text-accent" />}
-          </motion.button>
-        ))}
+        {projects.map((project, i) => {
+          const tracked = timerFor(state, project.id)
+          return (
+            <motion.button
+              key={project.id}
+              type="button"
+              data-testid={mode === 'add' ? 'widget-add-option' : 'widget-project-option'}
+              initial={{ opacity: 0, x: 8 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.18, delay: Math.min(i * 0.03, 0.15), ease: [0.22, 1, 0.36, 1] }}
+              onClick={() => {
+                if (mode === 'add') view.setDraft(project.id)
+                else view.pick(project.id)
+                onDone()
+              }}
+              className="flex h-9 w-full items-center gap-2.5 rounded-lg px-2 text-left text-[13px] text-ink-2 transition-colors duration-100 hover:bg-hover hover:text-ink"
+            >
+              <span className="size-2 shrink-0 rounded-full" style={{ background: colorOf(project) }} />
+              <span className="min-w-0 flex-1 truncate">{project.name}</span>
+              {project.id === view.projectId ? (
+                <Check className="size-3.5 shrink-0 text-accent" />
+              ) : (
+                tracked && <span className="text-[11px] text-ink-3">{m.status[tracked.status]}</span>
+              )}
+            </motion.button>
+          )
+        })}
       </div>
     </div>
   )
@@ -83,24 +133,29 @@ function ProjectList({ state, onDone }: { state: AppData; onDone: () => void }):
 
 function Controls({
   state,
-  savedSessionId,
+  view,
+  saved: savedInfo,
   onStopped,
-  onPickProject
+  onPickProject,
+  onAddTimer
 }: {
   state: AppData
-  savedSessionId: string | null
-  onStopped: () => void
+  view: TimerView
+  saved: SavedInfo | null
+  onStopped: (projectId: string, sessionId: string | null) => void
   onPickProject: () => void
+  onAddTimer: () => void
 }): React.JSX.Element {
   const { m } = useI18n()
-  const { active } = state
-  const elapsed = useElapsed(active)
-  const projectId = active?.projectId ?? state.selectedProjectId
+  const { timer, projectId } = view
+  const elapsed = useElapsed(timer)
   const project = state.projects.find((p) => p.id === projectId)
-  const saved = !active && savedSessionId ? state.sessions.find((s) => s.id === savedSessionId) : undefined
-  const running = active?.status === 'running'
-  const paused = active?.status === 'paused'
+  const saved =
+    !timer && savedInfo?.projectId === projectId ? state.sessions.find((s) => s.id === savedInfo?.sessionId) : undefined
+  const running = timer?.status === 'running'
+  const paused = timer?.status === 'paused'
   const statusText = running ? m.status.running : paused ? m.status.paused : saved ? m.status.saved : m.status.idle
+  const canStart = Boolean(project) && !running && (Boolean(timer) || state.timers.length < MAX_TIMERS)
 
   if (activeProjects(state).length === 0) {
     return (
@@ -118,17 +173,53 @@ function Controls({
     )
   }
 
+  const tabs: TimerTab[] = view.tabIds.flatMap((id) => {
+    const item = state.projects.find((p) => p.id === id)
+    if (!item) return []
+    const tabTimer = timerFor(state, id) ?? null
+    return [
+      {
+        id,
+        label: item.name,
+        color: colorOf(item),
+        timer: tabTimer,
+        statusLabel: m.status[tabTimer?.status ?? 'idle']
+      }
+    ]
+  })
+  if (tabs.length === 0) tabs.push({ id: '', label: m.common.chooseProject, statusLabel: m.status.idle, timer: null })
+
+  const nameWidth = Math.min(
+    MAX_NAME,
+    PANEL_INNER - (tabs.length - 1) * COLLAPSED_TAB - (view.canAdd ? ADD_BUTTON : 0) - ACTIVE_TAB_CHROME
+  )
+
+  const startView = (): void => {
+    if (projectId) void window.api.start(projectId).then(() => view.setDraft(null))
+  }
+
+  const stopView = (): void => {
+    if (!projectId) return
+    // Der gestoppte Tab bleibt kurz stehen, damit "Gespeichert" und das Namensfeld sichtbar sind.
+    view.setDraft(projectId)
+    void window.api.stop(projectId).then((sessionId) => onStopped(projectId, sessionId))
+  }
+
   return (
     <div className="flex h-full flex-col">
-      <button
-        type="button"
-        data-testid="widget-project"
-        onClick={onPickProject}
-        className="press -mx-1 flex h-8 items-center gap-2 self-start rounded-lg px-1.5 text-[13px] text-ink-2 hover:bg-hover hover:text-ink"
-      >
-        {project && <span className="size-2 rounded-full" style={{ background: colorOf(project) }} />}
-        <span className="max-w-[210px] truncate">{project?.name ?? m.common.chooseProject}</span>
-      </button>
+      <div className="-mx-1.5 flex h-8 items-center">
+        <TimerTabs
+          tabs={tabs}
+          value={projectId && tabs.some((t) => t.id === projectId) ? projectId : ''}
+          onChange={view.focus}
+          onOpenCurrent={onPickProject}
+          label={m.timer.activeTimers}
+          testId="widget-tab"
+          activeTestId="widget-project"
+          labelMaxWidth={nameWidth}
+        />
+        {view.canAdd && <AddTimerButton label={m.timer.addParallel} onClick={onAddTimer} testId="widget-add" />}
+      </div>
 
       <div className="mt-1.5 flex items-end justify-between">
         <AnimateDigits
@@ -146,17 +237,19 @@ function Controls({
       </div>
 
       <div className="mt-1.5 h-8">
-        {active && (
+        {timer && (
           <NameField
-            value={active.name}
+            key={timer.projectId}
+            value={timer.name}
             label={m.common.sessionName}
             testId="widget-name"
-            onCommit={(name) => void window.api.renameActive(name)}
+            onCommit={(name) => void window.api.renameActive(name, timer.projectId)}
             className="-ml-2 h-8 w-[calc(100%+8px)] text-[12px] text-ink-3 focus:text-ink"
           />
         )}
         {saved && (
           <NameField
+            key={saved.id}
             value={saved.name}
             label={m.common.savedSessionName}
             testId="widget-saved-name"
@@ -173,8 +266,8 @@ function Controls({
               id: 'start',
               label: paused ? m.action.resume : m.action.start,
               icon: <Play className={ICON} />,
-              disabled: running || !project,
-              onClick: () => void window.api.start()
+              disabled: !canStart,
+              onClick: startView
             },
             {
               id: 'pause',
@@ -182,14 +275,14 @@ function Controls({
               icon: <Pause className={ICON} />,
               disabled: !running,
               active: paused,
-              onClick: () => void window.api.pause()
+              onClick: () => void window.api.pause(projectId ?? undefined)
             },
             {
               id: 'stop',
               label: m.action.stop,
               icon: <Square className={ICON} />,
-              disabled: !active,
-              onClick: () => void window.api.stop().then(onStopped)
+              disabled: !timer,
+              onClick: stopView
             },
             {
               id: 'open',
@@ -207,8 +300,10 @@ function Controls({
 function Widget(): React.JSX.Element | null {
   const state = useAppState()
   const [open, setOpen] = useState(false)
-  const [view, setView] = useState<'controls' | 'projects'>('controls')
-  const [savedSessionId, setSavedSessionId] = useState<string | null>(null)
+  const [panel, setPanel] = useState<'controls' | 'projects' | 'add'>('controls')
+  const [saved, setSaved] = useState<SavedInfo | null>(null)
+  const view = useTimerView(state)
+  const { setDraft } = view
   const rootRef = useRef<HTMLDivElement>(null)
   const hovering = useRef(false)
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -224,9 +319,11 @@ function Widget(): React.JSX.Element | null {
       // Solange getippt wird, bleibt die Schublade offen.
       if (hovering.current || document.activeElement instanceof HTMLInputElement) return
       setOpen(false)
-      setView('controls')
+      setPanel('controls')
+      // Ein nicht gestarteter Tab verschwindet mit der Schublade.
+      setDraft(null)
     }, CLOSE_DELAY_MS)
-  }, [])
+  }, [setDraft])
 
   const enter = (): void => {
     hovering.current = true
@@ -255,17 +352,30 @@ function Widget(): React.JSX.Element | null {
   }, [leave, scheduleClose])
 
   useEffect(() => {
-    if (!savedSessionId) return
-    const timer = setTimeout(() => {
-      if (!(document.activeElement instanceof HTMLInputElement)) setSavedSessionId(null)
-    }, SAVED_VISIBLE_MS)
+    if (!saved) return
+    let timer: ReturnType<typeof setTimeout>
+    const expire = (): void => {
+      // Wer gerade den Namen tippt, behält die Anzeige. Danach läuft sie von selbst aus.
+      if (document.activeElement instanceof HTMLInputElement) {
+        timer = setTimeout(expire, SAVED_RECHECK_MS)
+        return
+      }
+      setSaved(null)
+      setDraft((current) => (current === saved.projectId ? null : current))
+    }
+    timer = setTimeout(expire, SAVED_VISIBLE_MS)
     return () => clearTimeout(timer)
-  }, [savedSessionId])
+  }, [saved, setDraft])
 
   if (!state) return null
 
-  const markSaved = (): void => {
-    void window.api.getState().then((latest) => setSavedSessionId(latest.sessions.at(-1)?.id ?? null))
+  const markStopped = (projectId: string, sessionId: string | null): void => {
+    if (sessionId) {
+      setSaved({ sessionId, projectId })
+    } else {
+      setSaved(null)
+      setDraft(null)
+    }
   }
 
   return (
@@ -298,22 +408,29 @@ function Widget(): React.JSX.Element | null {
           >
           <AnimatePresence mode="wait" initial={false}>
             <motion.div
-              key={view}
+              key={panel}
               className="h-full p-4 pb-3"
-              initial={{ opacity: 0, x: view === 'projects' ? 14 : -14, filter: 'blur(2px)' }}
+              initial={{ opacity: 0, x: panel === 'controls' ? -14 : 14, filter: 'blur(2px)' }}
               animate={{ opacity: open ? 1 : 0, x: 0, filter: 'blur(0px)' }}
-              exit={{ opacity: 0, x: view === 'projects' ? 14 : -14, transition: { duration: 0.1 } }}
-              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1], delay: open && view === 'controls' ? 0.04 : 0 }}
+              exit={{ opacity: 0, x: panel === 'controls' ? -14 : 14, transition: { duration: 0.1 } }}
+              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1], delay: open && panel === 'controls' ? 0.04 : 0 }}
             >
-              {view === 'controls' ? (
+              {panel === 'controls' ? (
                 <Controls
                   state={state}
-                  savedSessionId={savedSessionId}
-                  onStopped={markSaved}
-                  onPickProject={() => setView('projects')}
+                  view={view}
+                  saved={saved}
+                  onStopped={markStopped}
+                  onPickProject={() => setPanel('projects')}
+                  onAddTimer={() => setPanel('add')}
                 />
               ) : (
-                <ProjectList state={state} onDone={() => setView('controls')} />
+                <ProjectList
+                  state={state}
+                  view={view}
+                  mode={panel === 'add' ? 'add' : 'switch'}
+                  onDone={() => setPanel('controls')}
+                />
               )}
             </motion.div>
           </AnimatePresence>

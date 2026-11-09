@@ -66,15 +66,14 @@ function sampleData() {
     sessions,
     settings: { language: 'en', autostart: true, widgetEnabled: true, rounding: { minutes: 15, mode: 'nearest' } },
     selectedProjectId: 'atlas',
-    active: null,
+    timers: [],
     lastSeenAt: NOW
   }
 }
 
-const running = (data, since) => ({
-  ...data,
-  active: { status: 'running', projectId: 'harbor', name: 'Homepage copy', segments: [], openSince: since }
-})
+const harborTimer = (since) => ({ status: 'running', projectId: 'harbor', name: 'Homepage copy', segments: [], openSince: since })
+
+const running = (data, since) => ({ ...data, selectedProjectId: 'harbor', timers: [harborTimer(since)] })
 
 /** In-page stand-in for the Electron preload bridge. */
 function installMock(initial) {
@@ -94,32 +93,45 @@ function installMock(initial) {
       return () => listeners.delete(fn)
     },
     onNavigate: () => () => undefined,
-    start: async () => {
-      if (state.active?.status === 'paused') {
-        set({ ...state, active: { ...state.active, status: 'running', openSince: Date.now() } })
-      } else if (!state.active) {
-        const project = state.projects.find((p) => p.id === state.selectedProjectId)
+    start: async (projectId) => {
+      const id = projectId ?? state.selectedProjectId
+      const existing = state.timers.find((t) => t.projectId === id)
+      if (existing?.status === 'running') return
+      if (existing) {
+        set({ ...state, timers: state.timers.map((t) => (t === existing ? { ...t, status: 'running', openSince: Date.now() } : t)) })
+      } else {
         set({
           ...state,
-          active: { status: 'running', projectId: project.id, name: 'Logo concepts', segments: [], openSince: Date.now() }
+          selectedProjectId: id,
+          timers: [...state.timers, { status: 'running', projectId: id, name: 'Logo concepts', segments: [], openSince: Date.now() }]
         })
       }
     },
-    pause: async () => {
-      const a = state.active
+    pause: async (projectId) => {
+      const id = projectId ?? state.selectedProjectId
       set({
         ...state,
-        active: { ...a, status: 'paused', openSince: null, segments: [...a.segments, { start: a.openSince, end: Date.now() }] }
+        timers: state.timers.map((t) =>
+          t.projectId === id && t.openSince
+            ? { ...t, status: 'paused', openSince: null, segments: [...t.segments, { start: t.openSince, end: Date.now() }] }
+            : t
+        )
       })
     },
-    stop: async () => {
-      const a = state.active
+    stop: async (projectId) => {
+      const id = projectId ?? state.selectedProjectId
+      const a = state.timers.find((t) => t.projectId === id)
+      if (!a) return null
       const segments = a.openSince ? [...a.segments, { start: a.openSince, end: Date.now() }] : a.segments
+      const sessionId = `new-${Date.now()}`
+      const timers = state.timers.filter((t) => t !== a)
       set({
         ...state,
-        active: null,
-        sessions: [...state.sessions, { id: `new-${Date.now()}`, projectId: a.projectId, name: a.name, createdAt: Date.now(), segments }]
+        timers,
+        selectedProjectId: timers.at(-1)?.projectId ?? id,
+        sessions: [...state.sessions, { id: sessionId, projectId: a.projectId, name: a.name, createdAt: Date.now(), segments }]
       })
+      return sessionId
     },
     switchProject: async (id) => set({ ...state, selectedProjectId: id }),
     renameActive: async () => undefined,
@@ -305,6 +317,24 @@ await widgetShot('widget-projects', live, async (page) => {
   await page.waitForTimeout(200)
 })
 
+const parallel = {
+  ...live,
+  timers: [
+    { status: 'running', projectId: 'atlas', name: 'Packaging layout', segments: [], openSince: NOW - (47 * MIN + 31_000) },
+    { status: 'paused', projectId: 'nova', name: 'Bug triage', segments: [{ start: NOW - 30 * MIN, end: NOW - 12 * MIN }], openSince: null },
+    harborTimer(NOW - (83 * MIN + 7000))
+  ]
+}
+await widgetShot('widget-add-list', live, async (page) => {
+  await openWidget(page)
+  await page.getByTestId('widget-add').click()
+  await page.waitForTimeout(450)
+  await page.mouse.move(120, 180)
+  await page.waitForTimeout(200)
+})
+await widgetShot('widget-parallel-open', parallel, openWidget)
+await widgetShot('widget-parallel-closed', parallel, async () => undefined)
+
 // Composites
 await framed('timer')
 await framed('sessions')
@@ -327,6 +357,17 @@ await compose(
   'widget-states',
   `<div id="stage" style="${BACKDROP};width:1200px;height:370px;overflow:hidden;display:flex;justify-content:space-between;position:relative">
     ${['widget-closed', 'widget-open', 'widget-projects']
+      .map((n) => `<div style="width:400px;display:flex;justify-content:flex-end;border-left:1px solid rgba(255,255,255,.05)"><img src="${dataUri(rawPath(n))}" style="width:360px;height:520px;margin-top:-75px"></div>`)
+      .join('')}
+  </div>`,
+  1200,
+  1600
+)
+
+await compose(
+  'widget-parallel',
+  `<div id="stage" style="${BACKDROP};width:1200px;height:370px;overflow:hidden;display:flex;justify-content:space-between;position:relative">
+    ${['widget-add-list', 'widget-parallel-open', 'widget-parallel-closed']
       .map((n) => `<div style="width:400px;display:flex;justify-content:flex-end;border-left:1px solid rgba(255,255,255,.05)"><img src="${dataUri(rawPath(n))}" style="width:360px;height:520px;margin-top:-75px"></div>`)
       .join('')}
   </div>`,

@@ -2,13 +2,14 @@ import { useMemo } from 'react'
 import { Pause, Play, Plus, Square } from 'lucide-react'
 import { clock, hm, timeText } from '@shared/format'
 import { sessionEnd, sessionStart } from '@shared/report'
-import { segmentsMs } from '@shared/timer'
+import { freeProjects, MAX_TIMERS, segmentsMs, timerFor } from '@shared/timer'
 import type { AppData } from '@shared/types'
 import { NameField } from '@/components/NameField'
 import { AnimateDigits } from '@/components/ui/animate-digits'
 import { AnimatedSelect } from '@/components/ui/animated-select'
 import { Button } from '@/components/ui/button'
-import { activeProjects, colorOf, run, useElapsed } from '@/lib/app-state'
+import { TimerTabs, type TimerTab } from '@/components/ui/timer-tabs'
+import { activeProjects, colorOf, run, useElapsed, useTimerView } from '@/lib/app-state'
 import { useI18n } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 
@@ -57,12 +58,20 @@ export function TimerPage({
   onGoToProjects: () => void
 }): React.JSX.Element {
   const { m } = useI18n()
-  const { active } = state
-  const elapsed = useElapsed(active)
-  const running = active?.status === 'running'
-  const paused = active?.status === 'paused'
+  const view = useTimerView(state)
+  const { timer, projectId: selectedId } = view
+  const elapsed = useElapsed(timer)
+  const running = timer?.status === 'running'
+  const paused = timer?.status === 'paused'
   const projects = activeProjects(state)
-  const selectedId = active?.projectId ?? state.selectedProjectId
+  const tabs: TimerTab[] = view.tabIds.flatMap((id) => {
+    const project = state.projects.find((p) => p.id === id)
+    if (!project) return []
+    const tabTimer = timerFor(state, id) ?? null
+    return [
+      { id, label: project.name, color: colorOf(project), timer: tabTimer, statusLabel: m.status[tabTimer?.status ?? 'idle'] }
+    ]
+  })
 
   const today = useMemo(() => {
     const dayStart = new Date().setHours(0, 0, 0, 0)
@@ -94,17 +103,41 @@ export function TimerPage({
       />
 
       <section className="relative flex flex-col items-center pt-14">
-        <AnimatedSelect
-          className="w-64"
-          label={m.common.project}
-          placeholder={m.common.chooseProject}
-          testId="timer-project"
-          value={selectedId}
-          options={projects.map((p) => ({ id: p.id, label: p.name, color: colorOf(p) }))}
-          onChange={(id) => run(window.api.switchProject(id))}
-        />
+        <div className="relative w-64">
+          <AnimatedSelect
+            label={m.common.project}
+            placeholder={m.common.chooseProject}
+            testId="timer-project"
+            value={selectedId}
+            options={projects.map((p) => ({ id: p.id, label: p.name, color: colorOf(p) }))}
+            onChange={view.pick}
+          />
+          {/* Neben der Auswahl statt im Layout, damit sie mittig bleibt und sonst nichts springt. */}
+          <div className="absolute left-full top-1/2 ml-2 flex -translate-y-1/2 items-center gap-0.5">
+            {tabs.length > 1 && (
+              <TimerTabs
+                tabs={tabs}
+                value={selectedId ?? ''}
+                onChange={view.focus}
+                label={m.timer.activeTimers}
+                testId="timer-tab"
+              />
+            )}
+            {view.canAdd && (
+              <AnimatedSelect
+                label={m.timer.addParallel}
+                placeholder={m.timer.addParallel}
+                testId="timer-add"
+                triggerIcon={<Plus className="size-3.5" />}
+                value={null}
+                options={freeProjects(state).map((p) => ({ id: p.id, label: p.name, color: colorOf(p) }))}
+                onChange={(id) => view.setDraft(id)}
+              />
+            )}
+          </div>
+        </div>
 
-        <div className="mt-9" data-testid="timer-clock" data-status={active?.status ?? 'idle'}>
+        <div className="mt-9" data-testid="timer-clock" data-status={timer?.status ?? 'idle'}>
           <AnimateDigits
             value={clock(elapsed)}
             className={cn(
@@ -117,12 +150,13 @@ export function TimerPage({
         </div>
 
         <div className="mt-3 h-9 w-full max-w-md">
-          {active ? (
+          {timer ? (
             <NameField
-              value={active.name}
+              key={timer.projectId}
+              value={timer.name}
               label={m.common.sessionName}
               testId="timer-name"
-              onCommit={(name) => run(window.api.renameActive(name))}
+              onCommit={(name) => run(window.api.renameActive(name, timer.projectId))}
               className="h-9 w-full text-center text-[14px] text-ink-2 focus:text-ink"
             />
           ) : (
@@ -135,7 +169,7 @@ export function TimerPage({
             label={m.action.pause}
             testId="timer-pause"
             disabled={!running}
-            onClick={() => run(window.api.pause())}
+            onClick={() => run(window.api.pause(selectedId ?? undefined))}
           >
             <Pause className="size-5" />
           </RoundAction>
@@ -143,12 +177,17 @@ export function TimerPage({
             primary
             label={paused ? m.action.resume : m.action.start}
             testId="timer-start"
-            disabled={running || !selectedId}
-            onClick={() => run(window.api.start())}
+            disabled={running || !selectedId || (!timer && state.timers.length >= MAX_TIMERS)}
+            onClick={() => selectedId && run(window.api.start(selectedId).then(() => view.setDraft(null)))}
           >
             <Play className="size-6 translate-x-px" />
           </RoundAction>
-          <RoundAction label={m.action.stop} testId="timer-stop" disabled={!active} onClick={() => run(window.api.stop())}>
+          <RoundAction
+            label={m.action.stop}
+            testId="timer-stop"
+            disabled={!timer}
+            onClick={() => run(window.api.stop(selectedId ?? undefined).then(() => view.setDraft(null)))}
+          >
             <Square className="size-[18px]" />
           </RoundAction>
         </div>
