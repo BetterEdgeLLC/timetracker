@@ -186,6 +186,9 @@ const de = {
   chart: { label: 'Stunden pro Zeitabschnitt', noTime: 'Keine Zeit erfasst', hours: 'Stunden' },
   picker: {
     choose: 'Zeitraum wählen',
+    chooseDateTime: 'Datum und Uhrzeit wählen',
+    hour: 'Stunde',
+    minute: 'Minute',
     prevMonth: 'Vorheriger Monat',
     nextMonth: 'Nächster Monat',
     chooseStart: 'Startdatum wählen',
@@ -388,6 +391,9 @@ const en: Messages = {
   chart: { label: 'Hours per period', noTime: 'No time tracked', hours: 'hours' },
   picker: {
     choose: 'Choose period',
+    chooseDateTime: 'Choose date and time',
+    hour: 'Hour',
+    minute: 'Minute',
     prevMonth: 'Previous month',
     nextMonth: 'Next month',
     chooseStart: 'Choose start date',

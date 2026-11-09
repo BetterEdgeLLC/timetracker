@@ -5,6 +5,7 @@ import { defaultSessionName } from '@shared/timer'
 import type { AppData, Session } from '@shared/types'
 import { AnimatedSelect } from '@/components/ui/animated-select'
 import { Button, IconButton, inputClass } from '@/components/ui/button'
+import { DateTimeField } from '@/components/ui/date-time-field'
 import { Dialog } from '@/components/ui/dialog'
 import { activeProjects, colorOf, errorText } from '@/lib/app-state'
 import { useI18n } from '@/lib/i18n'
@@ -135,21 +136,17 @@ export function SessionDialog({
           <div className="thin-scroll flex max-h-44 flex-col gap-2 overflow-y-auto">
             {rows.map((row, i) => (
               <div key={row.key} className="flex items-center gap-2">
-                <input
-                  type="datetime-local"
-                  aria-label={m.sessionDialog.blockStart(i + 1)}
-                  data-testid="session-dialog-start"
-                  className={inputClass}
+                <DateTimeField
+                  label={m.sessionDialog.blockStart(i + 1)}
+                  testId="session-dialog-start"
                   value={row.start}
-                  onChange={(e) => updateRow(row.key, 'start', e.target.value)}
+                  onChange={(value) => updateRow(row.key, 'start', value)}
                 />
-                <input
-                  type="datetime-local"
-                  aria-label={m.sessionDialog.blockEnd(i + 1)}
-                  data-testid="session-dialog-end"
-                  className={inputClass}
+                <DateTimeField
+                  label={m.sessionDialog.blockEnd(i + 1)}
+                  testId="session-dialog-end"
                   value={row.end}
-                  onChange={(e) => updateRow(row.key, 'end', e.target.value)}
+                  onChange={(value) => updateRow(row.key, 'end', value)}
                 />
                 <IconButton
                   label={m.sessionDialog.removeBlock}

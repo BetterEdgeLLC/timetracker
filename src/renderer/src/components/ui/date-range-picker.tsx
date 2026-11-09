@@ -49,7 +49,7 @@ function presets(m: Messages): { label: string; range: (today: Date) => DateRang
   ]
 }
 
-function Month({
+export function Month({
   month,
   range,
   today,

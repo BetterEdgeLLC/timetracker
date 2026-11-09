@@ -51,8 +51,9 @@ input {
   user-select: text;
 }
 
+/* Das native Popup lässt sich nur mit Enter bestätigen, DateTimeField bringt ein eigenes mit. */
 input[type='datetime-local']::-webkit-calendar-picker-indicator {
-  opacity: 0.5;
+  display: none;
 }
 
 .drag {

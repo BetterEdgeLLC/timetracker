@@ -144,6 +144,45 @@ test('alle Abläufe in der echten App', async ({}, info) => {
     await expect(row).toHaveCount(1)
   })
 
+  await test.step('Uhrzeit im Picker per Knopf und per Enter bestätigen', async () => {
+    const end = r.main.getByTestId('session-dialog-end')
+    const openPicker = r.main.getByTestId('session-dialog-end-open')
+    const popover = r.main.getByTestId('datetime-popover')
+    const hour = (text: RegExp) => r.main.getByTestId('datetime-hour').filter({ hasText: text })
+    await r.main.getByTestId('sessions-add').click()
+
+    await openPicker.click()
+    await hour(/^07$/).click()
+    await r.main.getByTestId('datetime-minute').filter({ hasText: /^35$/ }).click()
+    await expect(r.main.getByTestId('datetime-preview')).toContainText('07:35')
+    await r.main.getByTestId('datetime-apply').click()
+    await expect(popover).toHaveCount(0)
+    await expect(end).toHaveValue(/T07:35$/)
+
+    // Escape verwirft nur die Auswahl, der Dialog bleibt offen.
+    await openPicker.click()
+    await hour(/^09$/).click()
+    await r.main.keyboard.press('Escape')
+    await expect(popover).toHaveCount(0)
+    await expect(end).toHaveValue(/T07:35$/)
+    await expect(r.main.getByTestId('session-dialog-save')).toBeVisible()
+
+    await openPicker.click()
+    await hour(/^09$/).click()
+    await r.main.keyboard.press('Enter')
+    await expect(popover).toHaveCount(0)
+    await expect(end).toHaveValue(/T09:35$/)
+
+    await openPicker.click()
+    await expect(popover).toBeVisible()
+    await pause(300)
+    await r.main.screenshot({ path: info.outputPath('datetime-picker.png') })
+    await r.main.keyboard.press('Escape')
+    await expect(popover).toHaveCount(0)
+    await r.main.getByRole('button', { name: 'Abbrechen' }).click()
+    await expect(r.main.getByTestId('session-dialog-save')).toHaveCount(0)
+  })
+
   await test.step('Auswertung: Summe, Filter, Gruppen, Zeitraum', async () => {
     await go(r.main, 'reports')
     await expect(r.main.getByTestId('total-sessions')).toHaveText('5')
