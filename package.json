@@ -1,7 +1,7 @@
 {
   "name": "timetracker",
   "productName": "Timetracker",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "Time tracking per project with side widget, reports and CSV export.",
   "author": "BetterEdgeLLC",
   "private": true,

@@ -21,7 +21,7 @@ All projects, names and amounts in these images are made up.
 ## Install
 
 1. Open the [latest release](https://github.com/BetterEdgeLLC/timetracker/releases/latest).
-2. Download `Timetracker-Setup-1.3.0.exe` and run it. It installs for your Windows user, so you don't need admin rights.
+2. Download `Timetracker-Setup-1.3.1.exe` and run it. It installs for your Windows user, so you don't need admin rights.
 
 The installer isn't code-signed, so Windows SmartScreen may warn you on first launch. Click **More info**, then **Run anyway**. If you'd rather not trust a binary, [build it yourself](#build-from-source).
 
